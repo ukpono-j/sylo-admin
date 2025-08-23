@@ -232,10 +232,13 @@ const Dashboard = () => {
   return (
     <div className="flex min-h-screen bg-gray-100 w-full overflow-x-hidden font-['Bricolage_Grotesque']">
       <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-      <div
-        className={`flex-1 p-3 sm:p-4 md:p-6 bg-gradient-to-br from-gray-50 to-gray-100 transition-all duration-300 ${
-          isCollapsed ? 'sm:ml-16' : 'sm:ml-64'
-        }`}
+
+      
+       <div
+        className="flex-1 p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-gray-50 to-gray-200 transition-all duration-300 lg:pt-8"
+        style={{
+          marginLeft: window.innerWidth >= 1024 ? (isCollapsed ? '88px' : '250px') : '0px',
+        }}
       >
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
