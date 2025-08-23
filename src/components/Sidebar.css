@@ -1,0 +1,89 @@
+* {
+  box-sizing: border-box;
+}
+
+.sidebar {
+  -webkit-transform: translateZ(0); /* Force hardware acceleration for Safari */
+  will-change: width, transform, overflow, padding;
+  transition-property: width, transform, overflow, padding;
+  transition-duration: 0.3s;
+  transition-timing-function: ease-in-out;
+  overflow-x: hidden;
+}
+
+.sidebar-header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  transition: padding 0.3s ease-in-out, width 0.3s ease-in-out;
+}
+
+.header-container {
+  position: relative;
+  width: 100%;
+}
+
+.logo-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+.logo-container.expanded {
+  justify-content: start;
+  padding-left: 16px;
+}
+
+.toggle-button {
+  display: flex;
+  justify-content: center;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.nav-container {
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.footer {
+  z-index: 50;
+  background: inherit;
+  padding-bottom: 16px;
+  transition: padding 0.3s ease-in-out;
+  min-height: 48px;
+}
+
+.footer.absolute {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+}
+
+.footer.sticky {
+  position: sticky;
+  bottom: 0;
+}
+
+.dashboard-content {
+  will-change: margin-left;
+  transition: margin-left 0.3s ease-in-out;
+}
+
+@media (max-width: 767px) {
+  .sidebar {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    overflow-x: hidden;
+  }
+}
