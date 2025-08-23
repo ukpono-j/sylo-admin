@@ -1,24 +1,35 @@
 import { useState } from 'react';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import axiosInstance from '../../utils/axiosConfig';
 
-const Login = ({ setIsAuthenticated }) => {
+const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/login`, {
+      const response = await axiosInstance.post('/api/admin/login', {
         email,
         password,
       });
       const { accessToken } = response.data;
       localStorage.setItem('adminToken', accessToken);
-      setIsAuthenticated(true);
-      window.location.href = '/';
+      toast.success('Login successful!', { autoClose: 1500 });
+      setTimeout(() => navigate('/', { replace: true }), 1500);
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
+      const errorMessage = err.response?.data?.error || 'Login failed. Please check your credentials.';
+      setError(errorMessage);
+      toast.error(errorMessage, { autoClose: 3000 });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -38,6 +49,7 @@ const Login = ({ setIsAuthenticated }) => {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#B38939] focus:border-[#B38939] transition-colors duration-200"
               required
+              disabled={isLoading}
             />
           </div>
           <div className="mb-6">
@@ -48,13 +60,15 @@ const Login = ({ setIsAuthenticated }) => {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#B38939] focus:border-[#B38939] transition-colors duration-200"
               required
+              disabled={isLoading}
             />
           </div>
           <button
             type="submit"
-            className="w-full bg-[#B38939] text-white p-3 rounded-lg hover:bg-[#BB954D] transition-colors duration-300 font-medium"
+            disabled={isLoading}
+            className="w-full bg-[#B38939] text-white p-3 rounded-lg hover:bg-[#BB954D] transition-colors duration-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Login
+            {isLoading ? 'Logging in...' : 'Login'}
           </button>
         </form>
       </div>

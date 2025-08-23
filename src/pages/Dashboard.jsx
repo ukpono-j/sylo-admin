@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import axiosInstance from '../../utils/axiosConfig';
 import Sidebar from '../components/Sidebar';
 import { Line, Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler, ArcElement } from 'chart.js';
 import moment from 'moment-timezone';
+import axios from 'axios';
 
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler, ArcElement);
@@ -18,7 +19,10 @@ const Dashboard = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [error, setError] = useState(null);
 
+  // Fetch data
   useEffect(() => {
+    let isMounted = true; // Track component mount state
+
     const fetchStats = async () => {
       try {
         setError(null);
@@ -26,6 +30,9 @@ const Dashboard = () => {
           axiosInstance.get('/api/admin/dashboard-stats'),
           axiosInstance.get('/api/admin/transactions'),
         ]);
+
+        if (!isMounted) return; // Prevent state updates if unmounted
+
         setStats(statsResponse.data.data);
 
         const allTransactions = transactionsResponse.data.data.transactions;
@@ -54,34 +61,54 @@ const Dashboard = () => {
 
         setTransactions(completedTransactions);
       } catch (error) {
-        console.error('Error fetching data:', error);
-        setError(
-          error.response?.data?.details
-            ? `${error.message}: ${error.response.data.details}`
-            : error.message || 'Failed to fetch dashboard data'
-        );
+        if (!isMounted) return; // Prevent state updates if unmounted
+
+        // Suppress error if it’s due to a canceled request
+        if (axios.isCancel(error)) {
+          return;
+        }
+
+        // Only set error if it’s not a session expiration or authentication error
+        if (error.message !== 'Session expired. Please login again.' && 
+            error.message !== 'Authentication failed. Please login again.') {
+          console.error('Error fetching data:', error);
+          setError(
+            error.response?.data?.details
+              ? `${error.message}: ${error.response.data.details}`
+              : error.message || 'Failed to fetch dashboard data'
+          );
+        }
       }
     };
 
     fetchStats();
+
+    // Cleanup on unmount
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Calculate total and average completed transaction amounts
-  const totalCompletedAmount = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-  const averageCompletedAmount = transactions.length > 0 ? totalCompletedAmount / transactions.length : 0;
+  // Memoize calculations to prevent unnecessary re-computations
+  const totalCompletedAmount = useMemo(() =>
+    transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0), [transactions]
+  );
+  const averageCompletedAmount = useMemo(() =>
+    transactions.length > 0 ? totalCompletedAmount / transactions.length : 0, [transactions, totalCompletedAmount]
+  );
 
-  // Get recent activities from transactions (limited to 3)
-  const recentActivities = transactions
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 3)
-    .map(t => ({
-      text: `Transaction ${t.status} (${t.paymentAmount ? `₦${Number(t.paymentAmount).toLocaleString()}` : 'N/A'})`,
-      time: moment(t.createdAt).tz('Africa/Lagos').fromNow(),
-      type: t.status,
-    }));
+  const recentActivities = useMemo(() =>
+    transactions
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 3)
+      .map(t => ({
+        text: `Transaction ${t.status} (${t.paymentAmount ? `₦${Number(t.paymentAmount).toLocaleString()}` : 'N/A'})`,
+        time: moment(t.createdAt).tz('Africa/Lagos').fromNow(),
+        type: t.status,
+      })), [transactions]
+  );
 
-  // Calculate percentage change for trends
-  const calculateTrend = (current, previous) => {
+  const calculateTrend = useCallback((current, previous) => {
     if (previous === 0 || previous == null) {
       return current > 0 ? '↗ New' : '→ 0%';
     }
@@ -90,31 +117,38 @@ const Dashboard = () => {
     return change > 0
       ? `↗ ${change.toFixed(1)}%`
       : `↘ ${Math.abs(change).toFixed(1)}%`;
-  };
+  }, []);
 
-  // Calculate trends using transactions data
+  // Calculate trends
   const currentMonth = moment().tz('Africa/Lagos').startOf('month');
   const lastMonth = moment().tz('Africa/Lagos').subtract(1, 'month').startOf('month');
-  const endOfLastMonth = moment().tz('Africa/Lagos').subtract(1, 'month').endOf('month');
 
-  // Transaction Count Trend
-  const currentTransactionCount = transactions.filter(t => moment(t.createdAt).isSameOrAfter(currentMonth)).length;
-  const lastTransactionCount = transactions.filter(t => 
-    moment(t.createdAt).isSameOrAfter(lastMonth) && moment(t.createdAt).isBefore(currentMonth)
-  ).length;
-  const transactionTrend = calculateTrend(currentTransactionCount, lastTransactionCount);
+  const currentTransactionCount = useMemo(() =>
+    transactions.filter(t => moment(t.createdAt).isSameOrAfter(currentMonth)).length, [transactions]
+  );
+  const lastTransactionCount = useMemo(() =>
+    transactions.filter(t =>
+      moment(t.createdAt).isSameOrAfter(lastMonth) && moment(t.createdAt).isBefore(currentMonth)
+    ).length, [transactions]
+  );
+  const transactionTrend = useMemo(() => calculateTrend(currentTransactionCount, lastTransactionCount), [currentTransactionCount, lastTransactionCount, calculateTrend]);
 
-  // Pending Withdrawals Trend
-  const currentPendingWithdrawals = transactions
-    .filter(t => t.status === 'pending' && moment(t.createdAt).isSameOrAfter(currentMonth))
-    .reduce((sum, t) => sum + (Number(t.paymentAmount) || 0), 0);
-  const lastPendingWithdrawals = transactions
-    .filter(t => t.status === 'pending' && moment(t.createdAt).isSameOrAfter(lastMonth) && moment(t.createdAt).isBefore(currentMonth))
-    .reduce((sum, t) => sum + (Number(t.paymentAmount) || 0), 0);
-  const pendingWithdrawalsTrend = calculateTrend(currentPendingWithdrawals, lastPendingWithdrawals);
+  const currentPendingWithdrawals = useMemo(() =>
+    transactions
+      .filter(t => t.status === 'pending' && moment(t.createdAt).isSameOrAfter(currentMonth))
+      .reduce((sum, t) => sum + (Number(t.paymentAmount) || 0), 0), [transactions]
+  );
+  const lastPendingWithdrawals = useMemo(() =>
+    transactions
+      .filter(t => t.status === 'pending' && moment(t.createdAt).isSameOrAfter(lastMonth) && moment(t.createdAt).isBefore(currentMonth))
+      .reduce((sum, t) => sum + (Number(t.paymentAmount) || 0), 0), [transactions]
+  );
+  const pendingWithdrawalsTrend = useMemo(() =>
+    calculateTrend(currentPendingWithdrawals, lastPendingWithdrawals), [currentPendingWithdrawals, lastPendingWithdrawals, calculateTrend]
+  );
 
-  // Line chart data
-  const getLineChartData = () => {
+  // Memoize chart data
+  const lineChartData = useMemo(() => {
     const monthlyData = transactions.reduce((acc, tx) => {
       const month = moment(tx.createdAt).tz('Africa/Lagos').format('MMM YYYY');
       acc[month] = (acc[month] || 0) + (tx.amount || 0);
@@ -142,9 +176,24 @@ const Dashboard = () => {
         },
       ],
     };
-  };
+  }, [transactions]);
 
-  const lineChartOptions = {
+  const pieChartData = useMemo(() => {
+    const labels = Object.keys(transactionStats);
+    const data = Object.values(transactionStats);
+    return {
+      labels,
+      datasets: [
+        {
+          data,
+          backgroundColor: ['#B38939', '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'],
+          hoverOffset: 8,
+        },
+      ],
+    };
+  }, [transactionStats]);
+
+  const lineChartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -186,25 +235,9 @@ const Dashboard = () => {
         grid: { display: false },
       },
     },
-  };
+  }), []);
 
-  // Pie chart data
-  const getPieChartData = () => {
-    const labels = Object.keys(transactionStats);
-    const data = Object.values(transactionStats);
-    return {
-      labels,
-      datasets: [
-        {
-          data,
-          backgroundColor: ['#B38939', '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'],
-          hoverOffset: 8,
-        },
-      ],
-    };
-  };
-
-  const pieChartOptions = {
+  const pieChartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -227,21 +260,17 @@ const Dashboard = () => {
         bodyFont: { family: 'Bricolage Grotesque', size: 10, weight: 400 },
       },
     },
-  };
+  }), []);
 
   return (
     <div className="flex min-h-screen bg-gray-100 w-full overflow-x-hidden font-['Bricolage_Grotesque']">
       <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-
-      
-       <div
-        className="flex-1 p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-gray-50 to-gray-200 transition-all duration-300 lg:pt-8"
-        style={{
-          marginLeft: window.innerWidth >= 1024 ? (isCollapsed ? '88px' : '250px') : '0px',
-        }}
+      <div
+        className={`flex-1 p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-gray-50 to-gray-200 transition-margin duration-300 lg:pt-8 ${
+          isCollapsed ? 'lg:ml-[88px]' : 'lg:ml-[250px]'
+        }`}
       >
         <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#1A202C] tracking-tight">
               Admin Dashboard
@@ -273,41 +302,40 @@ const Dashboard = () => {
 
           {stats ? (
             <>
-              {/* Stats Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { 
-                    title: 'Total Users', 
-                    value: stats.userCount, 
-                    trend: calculateTrend(stats.userCount, stats.userCountLastMonth), 
-                    icon: '👥', 
-                    description: 'Active platform users' 
+                  {
+                    title: 'Total Users',
+                    value: stats.userCount,
+                    trend: calculateTrend(stats.userCount, stats.userCountLastMonth),
+                    icon: '👥',
+                    description: 'Active platform users',
                   },
-                  { 
-                    title: 'Total Transactions', 
-                    value: stats.transactionCount, 
-                    trend: transactionTrend, 
-                    icon: '💳', 
-                    description: 'All transaction records' 
+                  {
+                    title: 'Total Transactions',
+                    value: stats.transactionCount,
+                    trend: transactionTrend,
+                    icon: '💳',
+                    description: 'All transaction records',
                   },
-                  { 
-                    title: 'Pending KYC', 
-                    value: stats.pendingKYC, 
-                    trend: calculateTrend(stats.pendingKYC, stats.pendingKYCLastMonth), 
-                    icon: '📋', 
-                    description: 'Awaiting verification' 
+                  {
+                    title: 'Pending KYC',
+                    value: stats.pendingKYC,
+                    trend: calculateTrend(stats.pendingKYC, stats.pendingKYCLastMonth),
+                    icon: '📋',
+                    description: 'Awaiting verification',
                   },
-                  { 
-                    title: 'Pending Withdrawals', 
-                    value: `₦${stats.pendingWithdrawals.toLocaleString()}`, 
-                    trend: pendingWithdrawalsTrend, 
-                    icon: '💰', 
-                    description: 'Awaiting processing' 
+                  {
+                    title: 'Pending Withdrawals',
+                    value: `₦${stats.pendingWithdrawals.toLocaleString()}`,
+                    trend: pendingWithdrawalsTrend,
+                    icon: '💰',
+                    description: 'Awaiting processing',
                   },
                 ].map((item, index) => (
                   <div
                     key={index}
-                    className="bg-white p-6 rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 group"
+                    className="bg-white p-6 rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300 border border-gray-100 group"
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="p-2 bg-gray-50 rounded-lg group-hover:bg-[#B38939] group-hover:bg-opacity-10 transition-colors duration-300">
@@ -316,8 +344,8 @@ const Dashboard = () => {
                       <div className="text-right">
                         <span
                           className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            item.trend.includes('↗') ? 'bg-green-100 text-green-800' : 
-                            item.trend.includes('↘') ? 'bg-red-100 text-red-800' : 
+                            item.trend.includes('↗') ? 'bg-green-100 text-green-800' :
+                            item.trend.includes('↘') ? 'bg-red-100 text-red-800' :
                             'bg-yellow-100 text-yellow-800'
                           }`}
                         >
@@ -332,7 +360,6 @@ const Dashboard = () => {
                 ))}
               </div>
 
-              {/* Transaction Analysis Summary */}
               {(transactions.length > 0 || Object.keys(transactionStats).length > 0) && (
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                   <div className="flex items-center justify-between mb-6">
@@ -360,27 +387,25 @@ const Dashboard = () => {
                 </div>
               )}
 
-              {/* Charts Section */}
               {(transactions.length > 0 || Object.keys(transactionStats).length > 0) && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {transactions.length > 0 && (
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                       <div className="h-80">
-                        <Line data={getLineChartData()} options={lineChartOptions} />
+                        <Line data={lineChartData} options={lineChartOptions} />
                       </div>
                     </div>
                   )}
                   {Object.keys(transactionStats).length > 0 && (
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                       <div className="h-80">
-                        <Doughnut data={getPieChartData()} options={pieChartOptions} />
+                        <Doughnut data={pieChartData} options={pieChartOptions} />
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Recent Activity */}
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-[#1A202C]">Recent Activity</h3>
@@ -416,7 +441,6 @@ const Dashboard = () => {
                 )}
               </div>
 
-              {/* Quick Actions */}
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <h3 className="text-lg font-semibold text-[#1A202C] mb-4">Quick Actions</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -428,7 +452,7 @@ const Dashboard = () => {
                   ].map((button, index) => (
                     <button
                       key={index}
-                      className={`p-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      className={`p-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
                         button.variant === 'primary'
                           ? 'bg-[#B38939] hover:bg-[#BB954D] text-white shadow-sm hover:shadow-md'
                           : button.variant === 'secondary'
