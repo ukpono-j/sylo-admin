@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Transactions from './pages/Transactions';
+import Disputes from './pages/Disputes';
 import Withdrawals from './pages/Withdrawals';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -33,6 +34,7 @@ const App = () => {
         <Route path="/" element={<Dashboard />} />
         <Route path="/users" element={<Users />} />
         <Route path="/transactions" element={<Transactions />} />
+        <Route path="/disputes" element={<Disputes />} />
         <Route path="/withdrawals" element={<Withdrawals />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

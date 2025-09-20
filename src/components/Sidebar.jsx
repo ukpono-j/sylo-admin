@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { HomeIcon, UserGroupIcon, CurrencyDollarIcon, BanknotesIcon, ArrowLeftOnRectangleIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, UserGroupIcon, CurrencyDollarIcon, BanknotesIcon, ArrowLeftOnRectangleIcon, Bars3Icon, XMarkIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import "./Sidebar.css";
 import Logo from "../assets/logo1.png";
 import { debounce } from 'lodash';
@@ -74,6 +74,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
               { to: '/', icon: HomeIcon, label: 'Dashboard' },
               { to: '/users', icon: UserGroupIcon, label: 'Users' },
               { to: '/transactions', icon: CurrencyDollarIcon, label: 'Transactions' },
+              { to: '/disputes', icon: ChatBubbleLeftRightIcon, label: 'Disputes' },
               { to: '/withdrawals', icon: BanknotesIcon, label: 'Withdrawals' },
             ].map(({ to, icon: Icon, label }, index) => (
               <NavLink
