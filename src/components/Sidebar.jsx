@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { HomeIcon, UserGroupIcon, CurrencyDollarIcon, BanknotesIcon, ArrowLeftOnRectangleIcon, Bars3Icon, XMarkIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, UserGroupIcon, CurrencyDollarIcon, BanknotesIcon,MagnifyingGlassIcon, ArrowLeftOnRectangleIcon, Bars3Icon, XMarkIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 
 // Sidebar configuration for consistent dimensions
 const SIDEBAR_CONFIG = {
@@ -30,6 +30,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
     { to: '/transactions', icon: CurrencyDollarIcon, label: 'Transactions' },
     { to: '/disputes', icon: ChatBubbleLeftRightIcon, label: 'Disputes' },
     { to: '/withdrawals', icon: BanknotesIcon, label: 'Withdrawals' },
+    { to: '/customer-lookup', icon: MagnifyingGlassIcon, label: 'Customer Lookup' },
   ];
 
   // Check if route is active

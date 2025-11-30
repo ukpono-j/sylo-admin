@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import CustomerLookup from './pages/CustomerLookup';
 import Users from './pages/Users';
 import Transactions from './pages/Transactions';
 import Disputes from './pages/Disputes';
@@ -37,6 +38,7 @@ const App = () => {
         <Route path="/disputes" element={<Disputes />} />
         <Route path="/withdrawals" element={<Withdrawals />} />
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/customer-lookup" element={<CustomerLookup />} />
       </Route>
     </Routes>
   );
